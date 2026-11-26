@@ -1,0 +1,307 @@
+// OceanSky Bank — Prisma schema
+//
+// NOTE: The OceanSky application currently uses an in-memory mock service
+// layer (src/lib/services/index.ts) and does NOT touch Prisma at runtime.
+// This schema is included so a real backend can adopt it as a starting
+// point. Run `bun run db:push` once you wire the services to use
+// `import { db } from "@/lib/db"` instead of the mock store.
+//
+// See ARCHITECTURE.md § 6 "Replacing the Mock Layer" for the migration path.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  phone        String
+  passwordHash String?
+  status       String   @default("active") // active | locked | dormant | pending
+  tier         String   @default("standard") // standard | premium | private
+  kycVerified  Boolean  @default(false)
+  nationality  String?
+  occupation   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  accounts     Account[]
+  cards        Card[]
+  beneficiaries Beneficiary[]
+  tickets      SupportTicket[]
+  notifications Notification[]
+  sessions     UserSession[]
+
+  @@map("customers")
+}
+
+model Account {
+  id               String   @id @default(cuid())
+  customerId       String
+  accountNumber    String   @unique
+  accountType      String // savings | current | fixed_deposit | domiciliary | joint
+  nickname         String?
+  currency         String   @default("NGN")
+  balance          Float    @default(0)
+  availableBalance Float    @default(0)
+  status           String   @default("active")
+  interestRatePct  Float?
+  openedAt         DateTime @default(now())
+  customer         Customer @relation(fields: [customerId], references: [id])
+  transactions     Transaction[]
+  cards            Card[]
+  billPayments     BillPayment[]
+  statements       Statement[]
+
+  @@map("accounts")
+}
+
+model Transaction {
+  id                 String   @id @default(cuid())
+  reference          String   @unique
+  accountId          String
+  customerId         String
+  type               String
+  direction          String // in | out
+  amount             Float
+  currency           String   @default("NGN")
+  description        String
+  counterparty       String?
+  counterpartyAccount String?
+  counterpartyBank   String?
+  category           String
+  status             String   @default("success")
+  fee                Float?
+  createdAt          DateTime @default(now())
+  valueDate          DateTime?
+  account            Account  @relation(fields: [accountId], references: [id])
+
+  @@map("transactions")
+}
+
+model Beneficiary {
+  id            String   @id @default(cuid())
+  customerId    String
+  nickname      String
+  accountName   String
+  accountNumber String
+  bankName      String
+  bankCode      String?
+  type          String // internal | external
+  currency      String   @default("NGN")
+  createdAt     DateTime @default(now())
+  lastUsedAt    DateTime?
+  customer      Customer @relation(fields: [customerId], references: [id])
+
+  @@map("beneficiaries")
+}
+
+model Card {
+  id                 String   @id @default(cuid())
+  customerId         String
+  accountId          String
+  type               String // virtual | physical
+  brand              String // visa | mastercard | verve
+  maskedPan          String
+  expiryMonth        String
+  expiryYear         String
+  holderName         String
+  status             String   @default("active")
+  color              String   @default("teal")
+  dailyLimit         Float
+  monthlyLimit       Float
+  spendingThisMonth  Float    @default(0)
+  onlineEnabled      Boolean  @default(true)
+  contactlessEnabled Boolean  @default(true)
+  atmEnabled         Boolean  @default(true)
+  posEnabled         Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  customer           Customer @relation(fields: [customerId], references: [id])
+  account            Account  @relation(fields: [accountId], references: [id])
+
+  @@map("cards")
+}
+
+model BillPayment {
+  id               String   @id @default(cuid())
+  customerId       String
+  accountId        String
+  billerId         String
+  billerName       String
+  category         String
+  amount           Float
+  currency         String   @default("NGN")
+  customerReference String
+  status           String   @default("success")
+  reference        String   @unique
+  createdAt        DateTime @default(now())
+  account          Account  @relation(fields: [accountId], references: [id])
+
+  @@map("bill_payments")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  customerId  String
+  type        String
+  title       String
+  body        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  actionUrl   String?
+  actionLabel String?
+  customer    Customer @relation(fields: [customerId], references: [id])
+
+  @@map("notifications")
+}
+
+model SupportTicket {
+  id              String   @id @default(cuid())
+  customerId      String
+  subject         String
+  category        String
+  status          String   @default("open")
+  priority        String   @default("medium")
+  assignedAgentId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+  unreadByCustomer Boolean @default(false)
+  unreadByAgent   Boolean  @default(false)
+  customer        Customer @relation(fields: [customerId], references: [id])
+  messages        ChatMessage[]
+
+  @@map("support_tickets")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  sender     String // customer | agent | system
+  senderName String
+  body       String
+  createdAt  DateTime @default(now())
+  status     String   @default("sent")
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model Statement {
+  id              String   @id @default(cuid())
+  customerId      String
+  accountId       String
+  startDate       DateTime
+  endDate         DateTime
+  openingBalance  Float
+  closingBalance  Float
+  totalCredits    Float
+  totalDebits     Float
+  transactionCount Int
+  generatedAt     DateTime @default(now())
+  format          String   @default("pdf")
+  downloadUrl     String?
+  account         Account  @relation(fields: [accountId], references: [id])
+
+  @@map("statements")
+}
+
+model UserSession {
+  id            String   @id @default(cuid())
+  customerId    String
+  device        String
+  browser       String
+  ipAddress     String
+  location      String
+  current       Boolean  @default(false)
+  lastActiveAt  DateTime @default(now())
+  customer      Customer @relation(fields: [customerId], references: [id])
+
+  @@map("user_sessions")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  role         String
+  department   String
+  status       String   @default("active")
+  lastActiveAt DateTime?
+  permissions  String   @default("[]") // JSON-encoded array
+
+  @@map("admin_users")
+}
+
+model RiskCase {
+  id            String   @id @default(cuid())
+  transactionId String
+  customerId    String
+  userName      String
+  amount        Float
+  currency      String
+  reason        String
+  riskScore     Int
+  riskLevel     String
+  status        String   @default("open")
+  assignedTo    String?
+  createdAt     DateTime @default(now())
+  notes         String?  // JSON-encoded array
+
+  @@map("risk_cases")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorType  String
+  actorId    String
+  actorName  String
+  action     String
+  resource   String
+  resourceId String?
+  metadata   String?
+  ipAddress  String
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String
+  description String
+  ctaLabel    String
+  ctaUrl      String
+  status      String   @default("draft")
+  audience    String   @default("all")
+  startsAt    DateTime
+  endsAt      DateTime
+  imageUrl    String?
+  accentColor String   @default("teal")
+
+  @@map("campaigns")
+}
+
+model BankSettings {
+  id                  String   @id @default(cuid()) @map("singleton")
+  bankName            String
+  bankCode            String
+  swiftCode           String
+  supportEmail        String
+  supportPhone        String
+  baseCurrency        String   @default("NGN")
+  transferFeeFlat     Float    @default(52.5)
+  transferFeePct      Float    @default(0.05)
+  dailyTransferLimit  Float    @default(5000000)
+  otpExpiryMinutes    Int      @default(5)
+  maintenanceMode     Boolean  @default(false)
+
+  @@map("bank_settings")
+}
