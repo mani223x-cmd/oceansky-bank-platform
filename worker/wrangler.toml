@@ -1,0 +1,43 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "oceansky-bank-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# ----------------------------------------------------------------------------
+# Non-secret configuration (safe to commit to GitHub).
+# Replace the values below with your actual Firebase project ID and Vercel URL.
+# ----------------------------------------------------------------------------
+[vars]
+ALLOWED_ORIGIN = "http://localhost:3000"
+FIREBASE_PROJECT_ID = "your-firebase-project-id"
+
+# ----------------------------------------------------------------------------
+# Secrets — DO NOT put secret values in this file.
+# Set them via the wrangler CLI:
+#
+#   wrangler secret put FIREBASE_CLIENT_EMAIL
+#   wrangler secret put FIREBASE_PRIVATE_KEY
+#
+# For local development, create a .dev.vars file (gitignored) with:
+#   FIREBASE_CLIENT_EMAIL = "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com"
+#   FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+#
+# The service account JSON is downloaded from:
+#   Firebase Console → Project Settings → Service Accounts → Generate new private key
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Observability (free tier — no paid plan required)
+# ----------------------------------------------------------------------------
+[observability]
+enabled = true
+
+# ----------------------------------------------------------------------------
+# KV Namespace for caching Firebase public keys (optional optimization).
+# Create with: wrangler kv namespace create FIREBASE_CERTS_CACHE
+# Then uncomment the binding below and add the ID.
+# ----------------------------------------------------------------------------
+# [[kv_namespaces]]
+# binding = "FIREBASE_CERTS_CACHE"
+# id = "your-kv-namespace-id"

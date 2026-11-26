@@ -1,0 +1,18 @@
+# ============================================================================
+# Local Development Environment Variables for the OceanSky Worker
+# ----------------------------------------------------------------------------
+# Copy this file to .dev.vars (gitignored) and fill in the values from your
+# Firebase service account JSON.
+#
+# The service account JSON is downloaded from:
+#   Firebase Console → Project Settings → Service Accounts → Generate new private key
+#
+# From the JSON file, copy:
+#   client_email → FIREBASE_CLIENT_EMAIL
+#   private_key  → FIREBASE_PRIVATE_KEY (keep the \n escape sequences as-is)
+#
+# NEVER commit .dev.vars or the service account JSON to GitHub.
+# ============================================================================
+
+FIREBASE_CLIENT_EMAIL = "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com"
+FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"

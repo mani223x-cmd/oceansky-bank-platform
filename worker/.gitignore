@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Wrangler local state
+.wrangler/
+.dev.vars
+
+# Build output
+dist/
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# NEVER commit secrets:
+# - .dev.vars (contains service account credentials for local dev)
+# - service-account-key.json (Firebase service account)
+# - wrangler secret values are stored in Cloudflare, not in the repo
+.dev.vars
+*.service-account.json
+service-account-key.json

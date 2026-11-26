@@ -52,3 +52,12 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Cloudflare Worker (CP-11) — separate project in worker/
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars
+worker/dist/
+worker/coverage/
+worker/*.service-account.json
+worker/service-account-key.json
