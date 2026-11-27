@@ -52,6 +52,8 @@ import type {
   CreditAccountPayload,
   CreditAccountResult,
   AdminAccountSummary,
+  LedgerTransactionListResponse,
+  LedgerTransactionDetailResponse,
   FAQItem,
   NotificationPreferences,
   RiskCase,
@@ -989,6 +991,110 @@ export const adminService = {
 
       const result = await res.json();
       return result as ServiceResult<AdminAccountSummary[]>;
+    } catch {
+      return err(
+        "Unable to reach the secure processing service.",
+        "NETWORK_ERROR"
+      );
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // CP-13: Admin Transaction History (Worker-backed, READ-ONLY)
+  // --------------------------------------------------------------------------
+  // These methods call the Cloudflare Worker's transaction list and detail
+  // endpoints. All data comes from real Firestore via the Worker — no mock
+  // data is presented as real.
+  // --------------------------------------------------------------------------
+
+  async listLedgerTransactions(params: {
+    page?: number;
+    pageSize?: number;
+    cursor?: string | null;
+    search?: string;
+    type?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<ServiceResult<LedgerTransactionListResponse>> {
+    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL;
+    if (!workerUrl) {
+      return err(
+        "The secure processing service is not configured. Set NEXT_PUBLIC_WORKER_URL in the environment variables.",
+        "SERVICE_NOT_CONFIGURED"
+      );
+    }
+
+    const adminToken = useAuthStore.getState().adminToken;
+    if (!adminToken) {
+      return err(
+        "Administrator authentication is required for this operation.",
+        "AUTH_NOT_READY"
+      );
+    }
+
+    // Build query string
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set("page", String(params.page));
+    if (params.pageSize) searchParams.set("pageSize", String(params.pageSize));
+    if (params.cursor) searchParams.set("cursor", params.cursor);
+    if (params.search) searchParams.set("search", params.search);
+    if (params.type && params.type !== "all") searchParams.set("type", params.type);
+    if (params.status && params.status !== "all") searchParams.set("status", params.status);
+    if (params.fromDate) searchParams.set("fromDate", params.fromDate);
+    if (params.toDate) searchParams.set("toDate", params.toDate);
+
+    try {
+      const res = await fetch(
+        `${workerUrl}/api/admin/transactions?${searchParams.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+          },
+        }
+      );
+
+      const result = await res.json();
+      return result as ServiceResult<LedgerTransactionListResponse>;
+    } catch {
+      return err(
+        "Unable to reach the secure processing service. Please try again.",
+        "NETWORK_ERROR"
+      );
+    }
+  },
+
+  async getLedgerTransactionDetail(transactionId: string): Promise<ServiceResult<LedgerTransactionDetailResponse>> {
+    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL;
+    if (!workerUrl) {
+      return err(
+        "The secure processing service is not configured.",
+        "SERVICE_NOT_CONFIGURED"
+      );
+    }
+
+    const adminToken = useAuthStore.getState().adminToken;
+    if (!adminToken) {
+      return err(
+        "Administrator authentication is required.",
+        "AUTH_NOT_READY"
+      );
+    }
+
+    try {
+      const res = await fetch(
+        `${workerUrl}/api/admin/transactions/${encodeURIComponent(transactionId)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+          },
+        }
+      );
+
+      const result = await res.json();
+      return result as ServiceResult<LedgerTransactionDetailResponse>;
     } catch {
       return err(
         "Unable to reach the secure processing service.",

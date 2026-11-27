@@ -46,12 +46,14 @@ import { handleHealth } from "./routes/health";
 import { handleVerify } from "./routes/verify";
 import { handleCreditAccount } from "./routes/credit-account";
 import { handleCustomerAccounts } from "./routes/customer-accounts";
+import { handleListTransactions, handleTransactionDetail } from "./routes/transactions";
 
 // Exact-match routes — "METHOD /path" → handler.
 const EXACT_ROUTES: Record<string, (request: Request, env: Env) => Promise<Response>> = {
   "GET /api/health": handleHealth,
   "GET /api/admin/verify": handleVerify,
   "POST /api/admin/credit-account": handleCreditAccount,
+  "GET /api/admin/transactions": handleListTransactions,
 };
 
 // Pattern routes — for paths with parameters (e.g., /api/admin/customers/:customerId/accounts).
@@ -69,6 +71,12 @@ const PATTERN_ROUTES: PatternRoute[] = [
     segments: ["api", "admin", "customers", ":customerId", "accounts"],
     paramNames: ["customerId"],
     handler: (req, env, params) => handleCustomerAccounts(req, env, params.customerId),
+  },
+  {
+    method: "GET",
+    segments: ["api", "admin", "transactions", ":transactionId"],
+    paramNames: ["transactionId"],
+    handler: (req, env, params) => handleTransactionDetail(req, env, params.transactionId),
   },
 ];
 

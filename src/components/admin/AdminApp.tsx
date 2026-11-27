@@ -21,6 +21,7 @@ import { AdminStaff } from "@/components/admin/admin/Staff";
 import { AdminAuditLogs } from "@/components/admin/admin/AuditLogs";
 import { AdminSettings } from "@/components/admin/admin/Settings";
 import { AdminCreditAccount } from "@/components/admin/admin/CreditAccount";
+import { AdminLedgerHistory } from "@/components/admin/admin/LedgerHistory";
 
 export function AdminApp() {
   const { view, params, go } = useRouterStore();
@@ -104,6 +105,8 @@ function renderAdminView(view: string, params: string[]) {
       return <AdminSettings />;
     case "credit-account":
       return <AdminCreditAccount />;
+    case "ledger":
+      return <AdminLedgerHistory />;
     default:
       return <AdminDashboard />;
   }

@@ -497,3 +497,59 @@ export interface AdminAccountSummary {
   nickname?: string;
   openedAt: ISODate;
 }
+
+// ----------------------------------------------------------------------------
+// CP-13: Admin Transaction History (Worker-backed)
+// ----------------------------------------------------------------------------
+// These types are used by the adminService methods that call the Cloudflare
+// Worker's GET /api/admin/transactions and GET /api/admin/transactions/:id
+// endpoints.
+
+export interface LedgerTransactionSummary {
+  id: string;
+  reference: string;
+  type: string;
+  direction: string;
+  amount: number;
+  currency: string;
+  status: string;
+  category: string;
+  description: string;
+  counterparty: string;
+  ownerUid: string;
+  accountId: string;
+  createdAt: string;
+  fee: number;
+}
+
+export interface LedgerTransactionDetail extends LedgerTransactionSummary {
+  metadata?: Record<string, unknown>;
+  valueDate?: string;
+  counterpartyAccount?: string;
+  counterpartyBank?: string;
+}
+
+export interface LedgerAuditEntry {
+  id: string;
+  actorType: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  resource: string;
+  resourceId: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LedgerTransactionListResponse {
+  transactions: LedgerTransactionSummary[];
+  hasMore: boolean;
+  nextPageCursor: string | null;
+  page: number;
+  pageSize: number;
+}
+
+export interface LedgerTransactionDetailResponse {
+  transaction: LedgerTransactionDetail;
+  auditEntries: LedgerAuditEntry[];
+}

@@ -253,6 +253,102 @@ export class FirestoreClient {
   }
 
   // --------------------------------------------------------------------------
+  // Structured query — supports multiple filters, orderBy, limit, cursor
+  // --------------------------------------------------------------------------
+
+  /**
+   * Runs a structured Firestore query with composite filters, ordering,
+   * limit, and cursor-based pagination.
+   *
+   * @param collectionPath The full collection path (e.g., "bank/data/transactions")
+   * @param options.filters Array of { field, op, value } — all combined with AND
+   * @param options.orderBy Array of { field, direction } — "ASCENDING" or "DESCENDING"
+   * @param options.limit Maximum number of documents to return
+   * @param options.startAfter Array of raw JS values for the cursor (encoded via toFirestoreValue)
+   * @returns Array of { id, data } documents
+   */
+  async runStructuredQuery(
+    collectionPath: string,
+    options: {
+      filters?: Array<{ field: string; op: string; value: unknown }>;
+      orderBy?: Array<{ field: string; direction: "ASCENDING" | "DESCENDING" }>;
+      limit?: number;
+      startAfter?: Array<unknown>;
+    }
+  ): Promise<Array<{ id: string; data: Record<string, unknown> }>> {
+    const url = `${documentsUrl(this.projectId)}/${collectionPath}:runQuery`;
+    const collectionId = collectionPath.split("/").pop() as string;
+
+    // Build the where clause.
+    let where: Record<string, unknown> | undefined;
+    if (options.filters && options.filters.length > 0) {
+      if (options.filters.length === 1) {
+        // Single filter — use fieldFilter directly.
+        const f = options.filters[0];
+        where = {
+          fieldFilter: {
+            field: { fieldPath: f.field },
+            op: f.op,
+            value: toFirestoreValue(f.value),
+          },
+        };
+      } else {
+        // Multiple filters — use compositeFilter with AND.
+        where = {
+          compositeFilter: {
+            op: "AND",
+            filters: options.filters.map((f) => ({
+              fieldFilter: {
+                field: { fieldPath: f.field },
+                op: f.op,
+                value: toFirestoreValue(f.value),
+              },
+            })),
+          },
+        };
+      }
+    }
+
+    // Build the orderBy clause.
+    const orderBy = options.orderBy?.map((o) => ({
+      field: { fieldPath: o.field },
+      direction: o.direction,
+    }));
+
+    // Build the cursor.
+    const startAfter = options.startAfter?.map((v) => toFirestoreValue(v));
+
+    // Assemble the structured query.
+    const structuredQuery: Record<string, unknown> = {
+      from: [{ collectionId }],
+    };
+    if (where) structuredQuery.where = where;
+    if (orderBy) structuredQuery.orderBy = orderBy;
+    if (options.limit !== undefined) structuredQuery.limit = options.limit;
+    if (startAfter) structuredQuery.startAfter = startAfter;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: await this.authHeaders(),
+      body: JSON.stringify({ structuredQuery }),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Firestore runStructuredQuery failed (${res.status}): ${errorBody}`);
+    }
+
+    const results = await res.json();
+    const docs: Array<{ id: string; data: Record<string, unknown> }> = [];
+    for (const result of results as Array<Record<string, unknown>>) {
+      if (result.document) {
+        docs.push(decodeDocument(result.document as Parameters<typeof decodeDocument>[0]));
+      }
+    }
+    return docs;
+  }
+
+  // --------------------------------------------------------------------------
   // Transaction support — atomic read-modify-write operations
   // --------------------------------------------------------------------------
 
