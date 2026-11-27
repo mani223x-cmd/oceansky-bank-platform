@@ -44,13 +44,57 @@ import { handleCors } from "./cors";
 import { fail, notFound } from "./response";
 import { handleHealth } from "./routes/health";
 import { handleVerify } from "./routes/verify";
+import { handleCreditAccount } from "./routes/credit-account";
+import { handleCustomerAccounts } from "./routes/customer-accounts";
 
-// Route table — maps "METHOD /path" to a handler function.
-// CP-12 will add "POST /api/admin/credit-account" here.
-const ROUTES: Record<string, (request: Request, env: Env) => Promise<Response>> = {
+// Exact-match routes — "METHOD /path" → handler.
+const EXACT_ROUTES: Record<string, (request: Request, env: Env) => Promise<Response>> = {
   "GET /api/health": handleHealth,
   "GET /api/admin/verify": handleVerify,
+  "POST /api/admin/credit-account": handleCreditAccount,
 };
+
+// Pattern routes — for paths with parameters (e.g., /api/admin/customers/:customerId/accounts).
+// The :param segments are extracted and passed to the handler.
+interface PatternRoute {
+  method: string;
+  segments: string[]; // e.g., ["api", "admin", "customers", ":customerId", "accounts"]
+  paramNames: string[]; // e.g., ["customerId"]
+  handler: (request: Request, env: Env, params: Record<string, string>) => Promise<Response>;
+}
+
+const PATTERN_ROUTES: PatternRoute[] = [
+  {
+    method: "GET",
+    segments: ["api", "admin", "customers", ":customerId", "accounts"],
+    paramNames: ["customerId"],
+    handler: (req, env, params) => handleCustomerAccounts(req, env, params.customerId),
+  },
+];
+
+function matchPattern(
+  method: string,
+  pathSegments: string[]
+): { route: PatternRoute; params: Record<string, string> } | null {
+  for (const route of PATTERN_ROUTES) {
+    if (route.method !== method) continue;
+    if (route.segments.length !== pathSegments.length) continue;
+    const params: Record<string, string> = {};
+    let matched = true;
+    for (let i = 0; i < route.segments.length; i++) {
+      const routeSeg = route.segments[i];
+      const pathSeg = pathSegments[i];
+      if (routeSeg.startsWith(":")) {
+        params[routeSeg.slice(1)] = decodeURIComponent(pathSeg);
+      } else if (routeSeg !== pathSeg) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return { route, params };
+  }
+  return null;
+}
 
 export default {
   async fetch(
@@ -66,27 +110,34 @@ export default {
 
     // 2. Parse the route.
     const url = new URL(request.url);
+    const pathname = url.pathname.replace(/^\/+|\/+$/g, "");
+    const pathSegments = pathname ? pathname.split("/") : [];
     const routeKey = `${request.method} ${url.pathname}`;
-    const handler = ROUTES[routeKey];
 
-    if (!handler) {
-      return notFound(env.ALLOWED_ORIGIN);
+    // 3. Try exact match first.
+    const exactHandler = EXACT_ROUTES[routeKey];
+    if (exactHandler) {
+      try {
+        return await exactHandler(request, env);
+      } catch (err) {
+        console.error("Unhandled error:", err);
+        return fail("An internal error occurred.", "INTERNAL_ERROR", 500, env.ALLOWED_ORIGIN);
+      }
     }
 
-    // 3. Execute the handler with error handling.
-    try {
-      return await handler(request, env);
-    } catch (err) {
-      // Log to Cloudflare (visible in wrangler tail / dashboard).
-      // Never expose the internal error message to the client.
-      console.error("Unhandled error:", err);
-      return fail(
-        "An internal error occurred.",
-        "INTERNAL_ERROR",
-        500,
-        env.ALLOWED_ORIGIN
-      );
+    // 4. Try pattern match.
+    const patternMatch = matchPattern(request.method, pathSegments);
+    if (patternMatch) {
+      try {
+        return await patternMatch.route.handler(request, env, patternMatch.params);
+      } catch (err) {
+        console.error("Unhandled error:", err);
+        return fail("An internal error occurred.", "INTERNAL_ERROR", 500, env.ALLOWED_ORIGIN);
+      }
     }
+
+    // 5. No match — 404.
+    return notFound(env.ALLOWED_ORIGIN);
   },
 };
 

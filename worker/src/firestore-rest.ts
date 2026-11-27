@@ -251,4 +251,87 @@ export class FirestoreClient {
     }
     return docs;
   }
+
+  // --------------------------------------------------------------------------
+  // Transaction support — atomic read-modify-write operations
+  // --------------------------------------------------------------------------
+
+  /**
+   * Begins a Firestore read-write transaction.
+   * Returns the transaction ID (base64) to pass to getDocInTransaction + commit.
+   */
+  async beginTransaction(): Promise<string> {
+    const url = `${documentsUrl(this.projectId)}/:beginTransaction`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: await this.authHeaders(),
+      body: JSON.stringify({ options: { readWrite: {} } }),
+    });
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Firestore beginTransaction failed (${res.status}): ${errorBody}`);
+    }
+    const body = (await res.json()) as { transaction?: string };
+    if (!body.transaction) throw new Error("beginTransaction returned no transaction ID");
+    return body.transaction;
+  }
+
+  /**
+   * Reads a document within a transaction (serialized — no concurrent modification
+   * between this read and the subsequent commit).
+   */
+  async getDocInTransaction(
+    path: string,
+    transaction: string
+  ): Promise<{ data: Record<string, unknown> | null; updateTime?: string }> {
+    const url = `${documentsUrl(this.projectId)}:batchGet`;
+    const fullPath = `${documentsUrl(this.projectId)}/${path}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: await this.authHeaders(),
+      body: JSON.stringify({ documents: [fullPath], transaction }),
+    });
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Firestore batchGet failed (${res.status}): ${errorBody}`);
+    }
+    const results = (await res.json()) as Array<{
+      found?: { name?: string; fields?: Record<string, unknown>; updateTime?: string };
+      missing?: string;
+    }>;
+    if (results.length === 0 || results[0].missing) return { data: null };
+    const found = results[0].found;
+    if (!found) return { data: null };
+    const { data } = decodeDocument({ name: found.name, fields: found.fields });
+    return { data, updateTime: found.updateTime };
+  }
+
+  /**
+   * Commits a set of writes atomically within a transaction.
+   * Each write is a Firestore Write object. If any fails, the entire commit
+   * is rolled back. If a concurrent write invalidated the transaction, the
+   * commit fails with ABORTED — caller must retry.
+   */
+  async commit(
+    writes: Array<Record<string, unknown>>,
+    transaction: string
+  ): Promise<void> {
+    const url = `${documentsUrl(this.projectId)}:commit`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: await this.authHeaders(),
+      body: JSON.stringify({ writes, transaction }),
+    });
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Firestore commit failed (${res.status}): ${errorBody}`);
+    }
+  }
+
+  /**
+   * Helper: builds the full Firestore document path for a relative path.
+   */
+  docPath(relativePath: string): string {
+    return `${documentsUrl(this.projectId)}/${relativePath}`;
+  }
 }

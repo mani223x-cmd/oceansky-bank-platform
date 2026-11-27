@@ -112,7 +112,8 @@ export type TxnType =
   | "fee"
   | "interest"
   | "salary"
-  | "refund";
+  | "refund"
+  | "admin_credit";
 
 export type TxnStatus = "success" | "pending" | "failed" | "reversed";
 
@@ -457,4 +458,42 @@ export interface ServiceResult<T> {
   data?: T;
   error?: string;
   code?: string;
+}
+
+// ----------------------------------------------------------------------------
+// Admin Credit Account (CP-12)
+// ----------------------------------------------------------------------------
+// These types are used by the adminService.creditAccount method which calls
+// the Cloudflare Worker endpoint POST /api/admin/credit-account.
+// The Worker performs the atomic Firestore transaction server-side.
+
+export interface CreditAccountPayload {
+  customerId: string;
+  accountId: string;
+  amount: number;
+  currency: string; // "USD" | "EUR" — must match the account's currency
+  reason: string;   // 5–200 characters
+  reference: string; // unique transaction reference
+}
+
+export interface CreditAccountResult {
+  transactionId: string;
+  newBalance: number;
+  newAvailableBalance: number;
+  creditedAt: ISODate;
+  reference: string;
+}
+
+// Account summary returned by the Worker's GET /api/admin/customers/:id/accounts
+// endpoint. Used by the Credit Account UI to list a customer's accounts.
+export interface AdminAccountSummary {
+  id: string;
+  accountNumber: string;
+  accountType: AccountType;
+  currency: string;
+  balance: number;
+  availableBalance: number;
+  status: "active" | "frozen" | "closed";
+  nickname?: string;
+  openedAt: ISODate;
 }

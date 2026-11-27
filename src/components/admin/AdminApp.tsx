@@ -20,6 +20,7 @@ import { AdminCampaigns } from "@/components/admin/admin/Campaigns";
 import { AdminStaff } from "@/components/admin/admin/Staff";
 import { AdminAuditLogs } from "@/components/admin/admin/AuditLogs";
 import { AdminSettings } from "@/components/admin/admin/Settings";
+import { AdminCreditAccount } from "@/components/admin/admin/CreditAccount";
 
 export function AdminApp() {
   const { view, params, go } = useRouterStore();
@@ -101,6 +102,8 @@ function renderAdminView(view: string, params: string[]) {
       return <AdminAuditLogs />;
     case "settings":
       return <AdminSettings />;
+    case "credit-account":
+      return <AdminCreditAccount />;
     default:
       return <AdminDashboard />;
   }

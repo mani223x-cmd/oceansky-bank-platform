@@ -12,6 +12,7 @@
 //   touching the calling UI components. See ARCHITECTURE.md for the mapping.
 // ============================================================================
 import { v4 as uuid } from "uuid";
+import { useAuthStore } from "@/lib/store/auth.store";
 import {
   MOCK_ACCOUNTS,
   MOCK_ADMIN_USERS,
@@ -48,6 +49,9 @@ import type {
   Campaign,
   CardTransaction,
   ChatMessage,
+  CreditAccountPayload,
+  CreditAccountResult,
+  AdminAccountSummary,
   FAQItem,
   NotificationPreferences,
   RiskCase,
@@ -894,6 +898,103 @@ export const adminService = {
       createdAt: new Date().toISOString(),
     });
     return delay(ok(db.settings));
+  },
+
+  // --------------------------------------------------------------------------
+  // CP-12: Admin Credit Account
+  // --------------------------------------------------------------------------
+  // These methods call the Cloudflare Worker (POST /api/admin/credit-account
+  // and GET /api/admin/customers/:id/accounts). The Worker verifies the
+  // Firebase ID token, checks the admin custom claim, and performs the atomic
+  // Firestore transaction server-side.
+  //
+  // DEPENDENCY: These methods require:
+  //   1. NEXT_PUBLIC_WORKER_URL to be set in Vercel env vars.
+  //   2. A real Firebase ID token in useAuthStore.adminToken (set by CP-3
+  //      Firebase Auth integration — not yet implemented in the frontend).
+  //
+  // If either is missing, the methods return a clear error. No fake success.
+  // --------------------------------------------------------------------------
+
+  async creditAccount(payload: CreditAccountPayload): Promise<ServiceResult<CreditAccountResult>> {
+    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL;
+    if (!workerUrl) {
+      return err(
+        "The secure processing service is not configured. Set NEXT_PUBLIC_WORKER_URL in the environment variables.",
+        "SERVICE_NOT_CONFIGURED"
+      );
+    }
+
+    // The admin token must be a real Firebase ID token. Currently the auth
+    // store holds a mock token — the Worker will reject it. This is the
+    // correct behavior: the Worker is the security boundary.
+    const adminToken = useAuthStore.getState().adminToken;
+    if (!adminToken) {
+      return err(
+        "Administrator authentication is required for this operation.",
+        "AUTH_NOT_READY"
+      );
+    }
+
+    const idempotencyKey = crypto.randomUUID();
+
+    try {
+      const res = await fetch(`${workerUrl}/api/admin/credit-account`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      return result as ServiceResult<CreditAccountResult>;
+    } catch {
+      return err(
+        "Unable to reach the secure processing service. Please try again.",
+        "NETWORK_ERROR"
+      );
+    }
+  },
+
+  async listCustomerAccounts(customerId: string): Promise<ServiceResult<AdminAccountSummary[]>> {
+    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL;
+    if (!workerUrl) {
+      return err(
+        "The secure processing service is not configured.",
+        "SERVICE_NOT_CONFIGURED"
+      );
+    }
+
+    const adminToken = useAuthStore.getState().adminToken;
+    if (!adminToken) {
+      return err(
+        "Administrator authentication is required.",
+        "AUTH_NOT_READY"
+      );
+    }
+
+    try {
+      const res = await fetch(
+        `${workerUrl}/api/admin/customers/${encodeURIComponent(customerId)}/accounts`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+          },
+        }
+      );
+
+      const result = await res.json();
+      return result as ServiceResult<AdminAccountSummary[]>;
+    } catch {
+      return err(
+        "Unable to reach the secure processing service.",
+        "NETWORK_ERROR"
+      );
+    }
   },
 };
 

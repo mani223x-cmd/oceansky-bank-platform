@@ -10,6 +10,7 @@ import {
   Megaphone,
   Bell,
   AlertTriangle,
+  Banknote,
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
@@ -450,7 +451,14 @@ export function AdminDashboard() {
       </SectionCard>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <QuickAction
+          icon={Banknote}
+          title="Credit account"
+          desc="Credit a customer's account via secure ledger."
+          onClick={() => go("/admin/credit-account")}
+          accent="teal"
+        />
         <QuickAction
           icon={Bell}
           title="Broadcast notification"

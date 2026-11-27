@@ -6,6 +6,7 @@ import {
   Landmark,
   ArrowLeftRight,
   CreditCard,
+  Banknote,
   ShieldAlert,
   Headset,
   Bell,
@@ -54,6 +55,7 @@ const SECTIONS: NavSection[] = [
       { label: "Accounts", icon: Landmark, path: "/admin/accounts" },
       { label: "Transactions", icon: ArrowLeftRight, path: "/admin/transactions" },
       { label: "Cards", icon: CreditCard, path: "/admin/cards" },
+      { label: "Credit Account", icon: Banknote, path: "/admin/credit-account" },
     ],
   },
   {
